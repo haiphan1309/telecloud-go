@@ -7,8 +7,8 @@ ARG TARGETARCH
 ARG BUILDPLATFORM
 WORKDIR /app
 
-# Install curl, unzip, and Bun for frontend
-RUN apt-get update && apt-get install -y ca-certificates curl unzip && \
+# Install curl, unzip, Node.js, npm, and Bun for frontend
+RUN apt-get update && apt-get install -y ca-certificates curl unzip nodejs npm && \
     curl -fsSL https://bun.sh/install | bash && \
     mv /root/.bun/bin/bun /usr/local/bin/bun && \
     rm -rf /var/lib/apt/lists/*
