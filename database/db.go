@@ -22,19 +22,21 @@ func JoinPath(elem ...string) string {
 }
 
 type File struct {
-	ID            int        `db:"id" json:"id"`
-	MessageID     *int       `db:"message_id" json:"message_id"`
-	Filename      string     `db:"filename" json:"filename"`
-	Path          string     `db:"path" json:"path"`
-	Size          int64      `db:"size" json:"size"`
-	MimeType      *string    `db:"mime_type" json:"mime_type"`
-	ShareToken    *string    `db:"share_token" json:"share_token"`
-	IsFolder      bool       `db:"is_folder" json:"is_folder"`
-	ThumbPath     *string    `db:"thumb_path" json:"thumb_path"`
-	Owner         string     `db:"owner" json:"owner"`
-	CreatedAt     time.Time  `db:"created_at" json:"created_at"`
-	DeletedAt     *time.Time `db:"deleted_at" json:"deleted_at,omitempty"`
-	SharePassword *string    `db:"share_password" json:"-"`
+	ID             int        `db:"id" json:"id"`
+	MessageID      *int       `db:"message_id" json:"message_id"`
+	Filename       string     `db:"filename" json:"filename"`
+	Path           string     `db:"path" json:"path"`
+	Size           int64      `db:"size" json:"size"`
+	MimeType       *string    `db:"mime_type" json:"mime_type"`
+	ShareToken     *string    `db:"share_token" json:"share_token"`
+	IsFolder       bool       `db:"is_folder" json:"is_folder"`
+	ThumbPath      *string    `db:"thumb_path" json:"thumb_path"`
+	Owner          string     `db:"owner" json:"owner"`
+	CreatedAt      time.Time  `db:"created_at" json:"created_at"`
+	DeletedAt      *time.Time `db:"deleted_at" json:"deleted_at,omitempty"`
+	SharePassword  *string    `db:"share_password" json:"-"`
+	ShareViews     int        `db:"share_views" json:"share_views"`
+	ShareDownloads int        `db:"share_downloads" json:"share_downloads"`
 
 	// Virtual fields
 	DirectToken      string `db:"-" json:"direct_token,omitempty"`
@@ -239,7 +241,9 @@ const sqliteSchema = `
 		owner TEXT DEFAULT '',
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		deleted_at DATETIME,
-		share_password TEXT
+		share_password TEXT,
+		share_views INTEGER DEFAULT 0,
+		share_downloads INTEGER DEFAULT 0
 	);
 
 	CREATE TABLE IF NOT EXISTS settings (
@@ -358,7 +362,9 @@ const mysqlSchema = `
 		owner VARCHAR(191) DEFAULT '',
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		deleted_at DATETIME,
-		share_password TEXT
+		share_password TEXT,
+		share_views INT DEFAULT 0,
+		share_downloads INT DEFAULT 0
 	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 	CREATE TABLE IF NOT EXISTS settings (
@@ -476,7 +482,9 @@ const postgresSchema = `
 		owner TEXT DEFAULT '',
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 		deleted_at TIMESTAMP,
-		share_password TEXT
+		share_password TEXT,
+		share_views INT DEFAULT 0,
+		share_downloads INT DEFAULT 0
 	);
 
 	CREATE TABLE IF NOT EXISTS settings (
@@ -611,6 +619,8 @@ func migrateSQLite() error {
 	DB.Exec("ALTER TABLE upload_tasks ADD COLUMN overwrite BOOLEAN DEFAULT 0")
 	DB.Exec("ALTER TABLE files ADD COLUMN deleted_at DATETIME")
 	DB.Exec("ALTER TABLE files ADD COLUMN share_password TEXT")
+	DB.Exec("ALTER TABLE files ADD COLUMN share_views INTEGER DEFAULT 0")
+	DB.Exec("ALTER TABLE files ADD COLUMN share_downloads INTEGER DEFAULT 0")
 	// Sessions get an explicit expiry column so we can stop trusting tokens
 	// older than 30 days, even if the cookie was somehow retained.
 	DB.Exec("ALTER TABLE sessions ADD COLUMN expires_at DATETIME")
@@ -730,6 +740,12 @@ func migrateMySQL() error {
 	if err := alterTableMySQL("files", "ADD COLUMN share_password TEXT"); err != nil {
 		return err
 	}
+	if err := alterTableMySQL("files", "ADD COLUMN share_views INT DEFAULT 0"); err != nil {
+		return err
+	}
+	if err := alterTableMySQL("files", "ADD COLUMN share_downloads INT DEFAULT 0"); err != nil {
+		return err
+	}
 	if err := alterTableMySQL("sessions", "ADD COLUMN expires_at DATETIME"); err != nil {
 		return err
 	}
@@ -753,6 +769,9 @@ func migratePostgres() error {
 	DB.Exec("CREATE INDEX IF NOT EXISTS idx_files_path ON files(path)")
 	DB.Exec("CREATE INDEX IF NOT EXISTS idx_files_filename ON files(filename)")
 	DB.Exec("CREATE INDEX IF NOT EXISTS idx_files_owner_path ON files(owner, path, filename)")
+	DB.Exec("ALTER TABLE files ADD COLUMN IF NOT EXISTS share_password TEXT")
+	DB.Exec("ALTER TABLE files ADD COLUMN IF NOT EXISTS share_views INT DEFAULT 0")
+	DB.Exec("ALTER TABLE files ADD COLUMN IF NOT EXISTS share_downloads INT DEFAULT 0")
 	DB.Exec("ALTER TABLE sessions ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP")
 	DB.Exec("CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at)")
 	DB.Exec("UPDATE sessions SET expires_at = created_at + INTERVAL '30 days' WHERE expires_at IS NULL")

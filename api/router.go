@@ -157,6 +157,7 @@ func SetupRouter(cfg *config.Config, contentFS fs.FS, startTG func(cfg *config.C
 		api.POST("/cancel_upload", h.handleCancelUpload)
 		api.POST("/actions/paste", h.handlePostPaste)
 		api.GET("/trash", h.handleGetTrashFiles)
+		api.GET("/shares", h.handleGetShares)
 		api.DELETE("/trash", h.handleEmptyTrash)
 		api.DELETE("/files/:id", h.handleDeleteFile)
 		api.POST("/files/:id/restore", h.handleRestoreFile)
