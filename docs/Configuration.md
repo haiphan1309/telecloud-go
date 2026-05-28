@@ -75,6 +75,26 @@ server {
         proxy_set_header Host $host;
         proxy_read_timeout 3600s;
     }
+
+    # Hỗ trợ S3 API (Bắt buộc cấu hình chính xác cho xác thực Signature V4/V2)
+    # Nhiều ứng dụng khách (như Rclone, Cyberduck, Infuse) sẽ lỗi 401 Unauthorized nếu cấu hình sai.
+    location /s3 {
+        # Bắt buộc dùng $http_host thay vì $host để tránh lệch chữ ký (Signature Mismatch)
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Tắt bộ đệm để truyền file dung lượng lớn qua S3 ổn định hơn
+        proxy_request_buffering off;
+        proxy_buffering off;
+        client_max_body_size 0;
+
+        # Cực kỳ quan trọng: KHÔNG THÊM dấu gạch chéo '/' ở cuối proxy_pass!
+        # Việc thêm dấu gạch chéo cuối sẽ kích hoạt tính năng chuẩn hóa URI của Nginx,
+        # làm giải mã ký tự đặc biệt %2F và cắt bỏ tiền tố /s3 dẫn tới sai chữ ký.
+        proxy_pass http://127.0.0.1:8091;
+    }
 }
 ```
 
@@ -133,6 +153,26 @@ server {
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
+    }
+
+    # S3 API Support (Required for AWS Signature V4/V2 authentication)
+    # Standard S3 clients (Rclone, Cyberduck, Infuse, etc.) will fail with 401 Unauthorized if misconfigured.
+    location /s3 {
+        # Required to use $http_host instead of $host to prevent Signature Mismatch
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Disable buffering to allow stable large S3 uploads
+        proxy_request_buffering off;
+        proxy_buffering off;
+        client_max_body_size 0;
+
+        # Crucial: DO NOT add a trailing slash '/' at the end of proxy_pass!
+        # A trailing slash forces Nginx to decode/normalize URI path (e.g. decodes %2F to /)
+        # and strips the '/s3' prefix, which breaks S3 signature verification.
+        proxy_pass http://127.0.0.1:8091;
     }
 }
 ```
